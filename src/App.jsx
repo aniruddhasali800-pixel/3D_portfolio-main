@@ -1,27 +1,14 @@
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 
 import { Footer, Navbar } from "./components";
-import { About, Contact, Home, Projects, Login, Admin } from "./pages";
-import { AuthProvider } from "./context/AuthContext";
-import ProtectedRoute from "./components/ProtectedRoute";
+import { About, Contact, Home, Projects } from "./pages";
 
-const App = () => {
   return (
     <main className='bg-slate-300/20'>
-      <AuthProvider>
         <Router>
           <Navbar />
           <Routes>
             <Route path='/' element={<Home />} />
-            <Route path='/login' element={<Login />} />
-            <Route
-              path='/admin/*'
-              element={
-                <ProtectedRoute>
-                  <Admin />
-                </ProtectedRoute>
-              }
-            />
             <Route
               path='/*'
               element={
@@ -37,7 +24,6 @@ const App = () => {
             />
           </Routes>
         </Router>
-      </AuthProvider>
     </main>
   );
 };

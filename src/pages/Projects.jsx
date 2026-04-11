@@ -7,29 +7,7 @@ import { arrow } from "../assets/icons";
 import { projects as defaultProjects } from "../constants";
 
 const Projects = () => {
-  const [projectsData, setProjectsData] = useState([...defaultProjects]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const response = await fetch("http://localhost:5000/api/projects");
-        const data = await response.json();
-        
-        // Merge default projects mapped to have IDs with firestore projects to prevent duplicates if imported
-        const dbNames = new Set(data.map(p => p.name));
-        const filteredDefaults = defaultProjects.filter(p => !dbNames.has(p.name)).map((p, i) => ({ ...p, id: `default-${i}` }));
-        
-        setProjectsData([...filteredDefaults, ...data]);
-      } catch (error) {
-        console.error("Error fetching projects:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProjects();
-  }, []);
+  const [projectsData] = useState([...defaultProjects]);
 
   return (
     <section className='max-container'>

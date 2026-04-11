@@ -26,19 +26,6 @@ const Contact = () => {
     setCurrentAnimation("hit");
 
     try {
-      // Save to Python Backend
-      await fetch("http://localhost:5000/api/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: form.name,
-          email: form.email,
-          message: form.message,
-        }),
-      });
-
       // Send Email via EmailJS
       await emailjs.send(
         import.meta.env.VITE_APP_EMAILJS_SERVICE_ID,
