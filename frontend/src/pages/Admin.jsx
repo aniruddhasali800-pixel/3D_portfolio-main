@@ -1,5 +1,5 @@
 import React, { useState, Suspense } from "react";
-import { AdminMessages, AdminProjects } from "../components";
+import { AdminMessages, AdminProjects, AdminMeetings } from "../components";
 import { auth } from "../firebase";
 import { signOut } from "firebase/auth";
 import { useAuth } from "../context/AuthContext";
@@ -16,6 +16,18 @@ const Admin = () => {
       await signOut(auth);
     } catch (error) {
       console.error("Error signing out:", error);
+    }
+  };
+
+  const renderActiveComponent = () => {
+    switch (activeTab) {
+      case "messages":
+        return <AdminMessages />;
+      case "meetings":
+        return <AdminMeetings />;
+      case "projects":
+      default:
+        return <AdminProjects />;
     }
   };
 
@@ -73,11 +85,19 @@ const Admin = () => {
             >
               Messages
             </button>
+            <button
+              onClick={() => setActiveTab("meetings")}
+              className={`px-6 py-2 rounded-full font-semibold transition-colors ${
+                activeTab === "meetings" ? "bg-blue-500 text-white shadow-md" : "bg-white/60 text-slate-600 hover:bg-white/80"
+              }`}
+            >
+              Meetings
+            </button>
           </div>
 
           <div className='flex-1 overflow-y-auto overflow-x-hidden pr-2 rounded-2xl'>
             <div className='bg-white/70 backdrop-blur-sm rounded-2xl mt-4'>
-              {activeTab === "messages" ? <AdminMessages /> : <AdminProjects />}
+              {renderActiveComponent()}
             </div>
           </div>
         </div>

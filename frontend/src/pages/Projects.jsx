@@ -1,18 +1,43 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-
 import { CTA } from "../components";
 import { arrow } from "../assets/icons";
 import { projects as defaultProjects } from "../constants";
+import { API_BASE_URL } from "../config";
 
 const Projects = () => {
-  const [projectsData] = useState([...defaultProjects]);
+  const [projectsData, setProjectsData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/projects`);
+        const customProjects = await response.json();
+        
+        // Merge custom projects from database and hardcoded default projects
+        // Skip default projects if a custom project with the exact name already exists
+        const customNames = new Set(customProjects.map(p => p.name));
+        const filteredDefaults = defaultProjects.filter(p => !customNames.has(p.name));
+        
+        setProjectsData([...filteredDefaults, ...customProjects]);
+      } catch (error) {
+        console.error("Error fetching projects:", error);
+        // Fallback to defaults on error
+        setProjectsData(defaultProjects);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProjects();
+  }, []);
 
   return (
     <section className='max-container'>
       <h1 className='head-text'>
-        My{"Aniruddha "}
+        My{" "}
         <span className='blue-gradient_text drop-shadow font-semibold'>
           Projects
         </span>
@@ -26,12 +51,12 @@ const Projects = () => {
         Your collaboration is highly valued!
       </p>
 
-      {projectsData.length === 0 ? (
+      {projectsData.length === 0 && loading ? (
         <div className='my-20 text-center text-slate-500'>Loading projects...</div>
       ) : (
         <div className='flex flex-wrap my-20 gap-16'>
           {projectsData.map((project) => (
-            <div className='lg:w-[400px] w-full' key={project.name || project.id}>
+            <div className='lg:w-[400px] w-full' key={project.name || project.id || project._id}>
               <div className='block-container w-12 h-12'>
                 <div className={`btn-back rounded-xl ${project.theme}`} />
                 <div className='btn-front rounded-xl flex justify-center items-center overflow-hidden'>
@@ -48,7 +73,7 @@ const Projects = () => {
                   {project.name}
                 </h4>
                 <p className='mt-2 text-slate-500'>{project.description}</p>
-                <div className='mt-5 flex items-center gap-2 font-poppins'>
+                <div className='mt-5 flex flex-wrap items-center gap-3 font-poppins text-sm'>
                   <Link
                     to={project.link}
                     target='_blank'
@@ -57,6 +82,19 @@ const Projects = () => {
                   >
                     Live Link
                   </Link>
+                  {project.githubLink && (
+                    <>
+                      <span className='text-slate-300'>|</span>
+                      <Link
+                        to={project.githubLink}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='font-semibold text-purple-600'
+                      >
+                        GitHub Link
+                      </Link>
+                    </>
+                  )}
                   <img
                     src={arrow}
                     alt='arrow'

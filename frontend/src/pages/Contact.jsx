@@ -1,20 +1,35 @@
-import emailjs from "@emailjs/browser";
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useRef, useState } from "react";
 
 import { Fox } from "../models";
 import useAlert from "../hooks/useAlert";
 import { Alert, Loader } from "../components";
+import { API_BASE_URL } from "../config";
 
 const Contact = () => {
   const formRef = useRef();
-  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [activeTab, setActiveTab] = useState("message"); // "message" or "meeting"
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    message: "",
+    subject: "Portfolio Project Discussion",
+    date: "",
+    time: "",
+  });
+  const [files, setFiles] = useState([]);
   const { alert, showAlert, hideAlert } = useAlert();
   const [loading, setLoading] = useState(false);
   const [currentAnimation, setCurrentAnimation] = useState("idle");
 
   const handleChange = ({ target: { name, value } }) => {
     setForm({ ...form, [name]: value });
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      setFiles(Array.from(e.target.files));
+    }
   };
 
   const handleFocus = () => setCurrentAnimation("walk");
@@ -26,26 +41,60 @@ const Contact = () => {
     setCurrentAnimation("hit");
 
     try {
-      // Send Email via EmailJS
-      await emailjs.send(
-        import.meta.env.VITE_APP_EMAILJS_SERVICE_ID,
-        import.meta.env.VITE_APP_EMAILJS_TEMPLATE_ID,
-        {
-          from_name: form.name,
-          to_name: "JavaScript Mastery",
-          from_email: form.email,
-          to_email: "sujata@jsmastery.pro",
-          message: form.message,
-        },
-        import.meta.env.VITE_APP_EMAILJS_PUBLIC_KEY
-      );
+      if (activeTab === "message") {
+        // 1. Send Message with optional attachments to Node.js backend
+        const formData = new FormData();
+        formData.append("name", form.name);
+        formData.append("email", form.email);
+        formData.append("message", form.message);
+        
+        files.forEach((file) => {
+          formData.append("attachments", file);
+        });
+
+        const response = await fetch(`${API_BASE_URL}/api/messages`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error("Failed to send message");
+
+        showAlert({
+          show: true,
+          text: "Thank you for your message 😃",
+          type: "success",
+        });
+      } else {
+        // 2. Schedule Video Call / Meeting
+        const response = await fetch(`${API_BASE_URL}/api/meetings`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: form.name,
+            email: form.email,
+            subject: form.subject,
+            date: form.date,
+            time: form.time,
+          }),
+        });
+
+        if (!response.ok) throw new Error("Failed to schedule meeting");
+
+        const data = await response.json();
+
+        showAlert({
+          show: true,
+          text: `Meeting confirmed! Meet Link: ${data.meeting.meetLink} 📹 Check your email.`,
+          type: "success",
+        });
+      }
 
       setLoading(false);
-      showAlert({
-        show: true,
-        text: "Thank you for your message 😃",
-        type: "success",
-      });
+      setFiles([]);
+      const fileInput = document.querySelector('input[type="file"]');
+      if (fileInput) fileInput.value = "";
 
       setTimeout(() => {
         hideAlert(false);
@@ -54,8 +103,11 @@ const Contact = () => {
           name: "",
           email: "",
           message: "",
+          subject: "Portfolio Project Discussion",
+          date: "",
+          time: "",
         });
-      }, [3000]);
+      }, 3000);
 
     } catch (error) {
       setLoading(false);
@@ -64,7 +116,9 @@ const Contact = () => {
 
       showAlert({
         show: true,
-        text: "I didn't receive your message 😢",
+        text: activeTab === "message" 
+          ? "I didn't receive your message 😢" 
+          : "Failed to schedule meeting 😢",
         type: "danger",
       });
     }
@@ -77,10 +131,36 @@ const Contact = () => {
       <div className='flex-1 min-w-[50%] flex flex-col'>
         <h1 className='head-text'>Get in Touch</h1>
 
+        {/* Tab Buttons */}
+        <div className='flex gap-4 mt-6 mb-2'>
+          <button
+            onClick={() => setActiveTab("message")}
+            type='button'
+            className={`px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm ${
+              activeTab === "message"
+                ? "bg-blue-600 text-white shadow-md transform scale-105"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            💬 Send Message
+          </button>
+          <button
+            onClick={() => setActiveTab("meeting")}
+            type='button'
+            className={`px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm ${
+              activeTab === "meeting"
+                ? "bg-blue-600 text-white shadow-md transform scale-105"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            📹 Book Video Call
+          </button>
+        </div>
+
         <form
           ref={formRef}
           onSubmit={handleSubmit}
-          className='w-full flex flex-col gap-7 mt-14'
+          className='w-full flex flex-col gap-6 mt-6'
         >
           <label className='text-black-500 font-semibold'>
             Name
@@ -102,7 +182,7 @@ const Contact = () => {
               type='email'
               name='email'
               className='input'
-              placeholder='John@gmail.com'
+              placeholder='john@gmail.com'
               required
               value={form.email}
               onChange={handleChange}
@@ -110,19 +190,81 @@ const Contact = () => {
               onBlur={handleBlur}
             />
           </label>
-          <label className='text-black-500 font-semibold'>
-            Your Message
-            <textarea
-              name='message'
-              rows='4'
-              className='textarea'
-              placeholder='Write your thoughts here...'
-              value={form.message}
-              onChange={handleChange}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-            />
-          </label>
+
+          {activeTab === "message" ? (
+            <>
+              <label className='text-black-500 font-semibold'>
+                Your Message
+                <textarea
+                  name='message'
+                  rows='4'
+                  className='textarea'
+                  placeholder='Write your thoughts here...'
+                  required
+                  value={form.message}
+                  onChange={handleChange}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                />
+              </label>
+              <label className='text-black-500 font-semibold'>
+                Attachments (Images / Files)
+                <input
+                  type='file'
+                  name='attachments'
+                  multiple
+                  onChange={handleFileChange}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                  className='input bg-white pt-2.5 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer'
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <label className='text-black-500 font-semibold'>
+                Subject
+                <input
+                  type='text'
+                  name='subject'
+                  className='input'
+                  placeholder='Discussion Topic'
+                  value={form.subject}
+                  onChange={handleChange}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                />
+              </label>
+              <div className='grid grid-cols-2 gap-4'>
+                <label className='text-black-500 font-semibold'>
+                  Meeting Date
+                  <input
+                    type='date'
+                    name='date'
+                    className='input'
+                    required
+                    value={form.date}
+                    onChange={handleChange}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
+                  />
+                </label>
+                <label className='text-black-500 font-semibold'>
+                  Preferred Time
+                  <input
+                    type='time'
+                    name='time'
+                    className='input'
+                    required
+                    value={form.time}
+                    onChange={handleChange}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
+                  />
+                </label>
+              </div>
+            </>
+          )}
 
           <button
             type='submit'
@@ -131,7 +273,7 @@ const Contact = () => {
             onFocus={handleFocus}
             onBlur={handleBlur}
           >
-            {loading ? "Sending..." : "Submit"}
+            {loading ? (activeTab === "message" ? "Sending..." : "Booking...") : "Submit"}
           </button>
         </form>
       </div>

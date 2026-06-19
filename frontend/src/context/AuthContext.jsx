@@ -14,7 +14,14 @@ export const AuthProvider = ({ children }) => {
     // Demo mode bypass
     const savedDemoUser = localStorage.getItem("demo_admin");
     if (savedDemoUser) {
-      setCurrentUser({ email: "admin@gmail.com" });
+      const email = localStorage.getItem("demo_admin_email") || "aniruddhasali800@gmail.com";
+      setCurrentUser({ email });
+      setLoading(false);
+      return;
+    }
+
+    if (!auth) {
+      // Firebase not configured, just finish loading
       setLoading(false);
       return;
     }
@@ -31,13 +38,15 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const loginDemo = () => {
+  const loginDemo = (email = "aniruddhasali800@gmail.com") => {
     localStorage.setItem("demo_admin", "true");
-    setCurrentUser({ email: "admin@gmail.com" });
+    localStorage.setItem("demo_admin_email", email);
+    setCurrentUser({ email });
   };
 
   const logoutDemo = () => {
     localStorage.removeItem("demo_admin");
+    localStorage.removeItem("demo_admin_email");
     setCurrentUser(null);
   };
 

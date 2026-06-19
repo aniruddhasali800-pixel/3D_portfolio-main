@@ -19,8 +19,8 @@ const Login = () => {
     setLoading(true);
 
     try {
-      if (email === "admin@gmail.com" && password === "123") {
-        loginDemo();
+      if ((email === "admin@gmail.com" || email === "aniruddhasali800@gmail.com") && password === "123") {
+        loginDemo(email);
         showAlert({
           show: true,
           text: "Logged in successfully (Demo)!",
