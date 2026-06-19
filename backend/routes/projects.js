@@ -2,12 +2,15 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import Project from "../models/Project.js";
 
 const router = express.Router();
 
 // Ensure upload directory exists
-const uploadDir = path.join(process.cwd(), "backend", "data", "uploads");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.join(__dirname, "..", "data", "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
