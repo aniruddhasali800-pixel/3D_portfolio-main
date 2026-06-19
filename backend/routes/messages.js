@@ -3,7 +3,9 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import mongoose from "mongoose";
 import Message from "../models/Message.js";
+import { jsonDb } from "../utils/jsonDb.js";
 import { sendNotificationEmail, sendReplyEmail } from "../utils/emailService.js";
 
 const router = express.Router();
@@ -35,7 +37,13 @@ const upload = multer({
 // GET all messages (for Admin)
 router.get("/", async (req, res) => {
   try {
-    const messages = await Message.find().sort({ createdAt: -1 });
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let messages;
+    if (isDbConnected) {
+      messages = await Message.find().sort({ createdAt: -1 });
+    } else {
+      messages = jsonDb.find("messages").sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
     res.json(messages);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch messages" });
@@ -57,21 +65,35 @@ router.post("/", upload.array("attachments", 5), async (req, res) => {
       contentType: file.mimetype,
     }));
 
-    const newMessage = new Message({
-      name,
-      email,
-      message,
-      attachments,
-    });
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let savedMessage;
 
-    await newMessage.save();
+    if (isDbConnected) {
+      const newMessage = new Message({
+        name,
+        email,
+        message,
+        attachments,
+      });
+      savedMessage = await newMessage.save();
+    } else {
+      console.log("⚠️ MongoDB is offline. Saving message to JSON database.");
+      savedMessage = jsonDb.insert("messages", {
+        name,
+        email,
+        message,
+        attachments,
+        isRead: false,
+        replies: [],
+      });
+    }
 
     // Send email notification to admin (in background, don't block response)
-    sendNotificationEmail(newMessage).catch((err) => {
+    sendNotificationEmail(savedMessage).catch((err) => {
       console.error("Nodemailer error:", err);
     });
 
-    res.status(201).json({ success: true, message: "Message sent successfully", data: newMessage });
+    res.status(201).json({ success: true, message: "Message sent successfully", data: savedMessage });
   } catch (error) {
     console.error("Error sending message:", error);
     res.status(500).json({ error: "Failed to send message" });
@@ -81,11 +103,19 @@ router.post("/", upload.array("attachments", 5), async (req, res) => {
 // PUT mark message as read
 router.put("/:id/read", async (req, res) => {
   try {
-    const message = await Message.findByIdAndUpdate(
-      req.params.id,
-      { isRead: true },
-      { new: true }
-    );
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let message;
+
+    if (isDbConnected) {
+      message = await Message.findByIdAndUpdate(
+        req.params.id,
+        { isRead: true },
+        { new: true }
+      );
+    } else {
+      message = jsonDb.findByIdAndUpdate("messages", req.params.id, { isRead: true });
+    }
+
     if (!message) {
       return res.status(404).json({ error: "Message not found" });
     }
@@ -103,17 +133,31 @@ router.post("/:id/reply", async (req, res) => {
       return res.status(400).json({ error: "Reply body is required" });
     }
 
-    const message = await Message.findById(req.params.id);
-    if (!message) {
-      return res.status(404).json({ error: "Message not found" });
-    }
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let message;
 
-    // Save reply in database
-    message.replies.push({
-      body,
-      repliedAt: Date.now(),
-    });
-    await message.save();
+    if (isDbConnected) {
+      message = await Message.findById(req.params.id);
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      message.replies.push({
+        body,
+        repliedAt: Date.now(),
+      });
+      await message.save();
+    } else {
+      message = jsonDb.findById("messages", req.params.id);
+      if (!message) {
+        return res.status(404).json({ error: "Message not found" });
+      }
+      if (!message.replies) message.replies = [];
+      message.replies.push({
+        body,
+        repliedAt: new Date().toISOString(),
+      });
+      message = jsonDb.findByIdAndUpdate("messages", req.params.id, { replies: message.replies });
+    }
 
     // Send reply via email
     await sendReplyEmail(message.email, subject || `Reply to your message: "${message.message.substring(0, 30)}..."`, body);
@@ -128,7 +172,15 @@ router.post("/:id/reply", async (req, res) => {
 // DELETE message
 router.delete("/:id", async (req, res) => {
   try {
-    const message = await Message.findById(req.params.id);
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let message;
+
+    if (isDbConnected) {
+      message = await Message.findById(req.params.id);
+    } else {
+      message = jsonDb.findById("messages", req.params.id);
+    }
+
     if (!message) {
       return res.status(404).json({ error: "Message not found" });
     }
@@ -140,7 +192,12 @@ router.delete("/:id", async (req, res) => {
       }
     }
 
-    await Message.findByIdAndDelete(req.params.id);
+    if (isDbConnected) {
+      await Message.findByIdAndDelete(req.params.id);
+    } else {
+      jsonDb.findByIdAndDelete("messages", req.params.id);
+    }
+
     res.json({ success: true, message: "Message deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete message" });
@@ -148,3 +205,4 @@ router.delete("/:id", async (req, res) => {
 });
 
 export default router;
+

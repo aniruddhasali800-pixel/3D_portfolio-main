@@ -20,6 +20,9 @@ const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/3d_por
 // Middleware
 const allowedOrigins = [
   "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
   "https://aniruddhasali.in",
   "http://aniruddhasali.in",
 ];
@@ -64,7 +67,7 @@ app.get("/api/health", (req, res) => {
 
 // Connect to MongoDB
 mongoose
-  .connect(MONGODB_URI)
+  .connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
   .then(() => {
     console.log("🔌 Connected to MongoDB database successfully!");
     // Start Express Server after database connection

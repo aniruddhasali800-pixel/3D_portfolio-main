@@ -3,7 +3,9 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import mongoose from "mongoose";
 import Project from "../models/Project.js";
+import { jsonDb } from "../utils/jsonDb.js";
 
 const router = express.Router();
 
@@ -34,7 +36,13 @@ const upload = multer({
 // GET all projects
 router.get("/", async (req, res) => {
   try {
-    const projects = await Project.find().sort({ createdAt: -1 });
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let projects;
+    if (isDbConnected) {
+      projects = await Project.find().sort({ createdAt: -1 });
+    } else {
+      projects = jsonDb.find("projects").sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
     res.json(projects);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch projects" });
@@ -53,17 +61,33 @@ router.post("/", upload.single("file"), async (req, res) => {
     // Use relative path for iconUrl so it works via proxy
     const iconUrl = `/api/uploads/${req.file.filename}`;
 
-    const newProject = new Project({
-      name,
-      description,
-      link,
-      theme: theme || "btn-back-blue",
-      iconUrl,
-      filename: req.file.filename,
-      githubLink: githubLink || "",
-    });
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let newProject;
 
-    await newProject.save();
+    if (isDbConnected) {
+      const project = new Project({
+        name,
+        description,
+        link,
+        theme: theme || "btn-back-blue",
+        iconUrl,
+        filename: req.file.filename,
+        githubLink: githubLink || "",
+      });
+      newProject = await project.save();
+    } else {
+      console.log("⚠️ MongoDB is offline. Saving project to JSON database.");
+      newProject = jsonDb.insert("projects", {
+        name,
+        description,
+        link,
+        theme: theme || "btn-back-blue",
+        iconUrl,
+        filename: req.file.filename,
+        githubLink: githubLink || "",
+      });
+    }
+
     res.status(201).json({ success: true, project: newProject });
   } catch (error) {
     console.error("Error creating project:", error);
@@ -80,11 +104,21 @@ router.put("/:id", async (req, res) => {
     if (githubLink !== undefined) updateData.githubLink = githubLink;
     updateData.updatedAt = Date.now();
 
-    const updatedProject = await Project.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
-    );
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let updatedProject;
+
+    if (isDbConnected) {
+      updatedProject = await Project.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true }
+      );
+    } else {
+      updatedProject = jsonDb.findByIdAndUpdate("projects", req.params.id, {
+        ...updateData,
+        updatedAt: new Date().toISOString(),
+      });
+    }
 
     if (!updatedProject) {
       return res.status(404).json({ error: "Project not found" });
@@ -99,7 +133,15 @@ router.put("/:id", async (req, res) => {
 // DELETE project
 router.delete("/:id", async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let project;
+
+    if (isDbConnected) {
+      project = await Project.findById(req.params.id);
+    } else {
+      project = jsonDb.findById("projects", req.params.id);
+    }
+
     if (!project) {
       return res.status(404).json({ error: "Project not found" });
     }
@@ -112,7 +154,12 @@ router.delete("/:id", async (req, res) => {
       }
     }
 
-    await Project.findByIdAndDelete(req.params.id);
+    if (isDbConnected) {
+      await Project.findByIdAndDelete(req.params.id);
+    } else {
+      jsonDb.findByIdAndDelete("projects", req.params.id);
+    }
+
     res.json({ success: true, message: "Project deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete project" });
@@ -120,3 +167,4 @@ router.delete("/:id", async (req, res) => {
 });
 
 export default router;
+

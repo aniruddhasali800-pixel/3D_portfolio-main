@@ -1,5 +1,7 @@
 import express from "express";
+import mongoose from "mongoose";
 import Meeting from "../models/Meeting.js";
+import { jsonDb } from "../utils/jsonDb.js";
 import { sendMeetingEmail } from "../utils/emailService.js";
 
 const router = express.Router();
@@ -16,7 +18,16 @@ const generateGoogleMeetLink = () => {
 // GET all meetings (for Admin)
 router.get("/", async (req, res) => {
   try {
-    const meetings = await Meeting.find().sort({ date: 1, time: 1 });
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let meetings;
+    if (isDbConnected) {
+      meetings = await Meeting.find().sort({ date: 1, time: 1 });
+    } else {
+      meetings = jsonDb.find("meetings").sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.time.localeCompare(b.time);
+      });
+    }
     res.json(meetings);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch meetings" });
@@ -33,17 +44,31 @@ router.post("/", async (req, res) => {
     }
 
     const meetLink = generateGoogleMeetLink();
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let newMeeting;
 
-    const newMeeting = new Meeting({
-      name,
-      email,
-      subject: subject || "Portfolio Project Discussion",
-      date,
-      time,
-      meetLink,
-    });
-
-    await newMeeting.save();
+    if (isDbConnected) {
+      const meeting = new Meeting({
+        name,
+        email,
+        subject: subject || "Portfolio Project Discussion",
+        date,
+        time,
+        meetLink,
+      });
+      newMeeting = await meeting.save();
+    } else {
+      console.log("⚠️ MongoDB is offline. Saving meeting to JSON database.");
+      newMeeting = jsonDb.insert("meetings", {
+        name,
+        email,
+        subject: subject || "Portfolio Project Discussion",
+        date,
+        time,
+        meetLink,
+        status: "pending",
+      });
+    }
 
     // Send email confirmation (non-blocking)
     sendMeetingEmail(newMeeting).catch((err) => {
@@ -66,11 +91,18 @@ router.put("/:id", async (req, res) => {
     if (date) updateData.date = date;
     if (time) updateData.time = time;
 
-    const updatedMeeting = await Meeting.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
-    );
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let updatedMeeting;
+
+    if (isDbConnected) {
+      updatedMeeting = await Meeting.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true }
+      );
+    } else {
+      updatedMeeting = jsonDb.findByIdAndUpdate("meetings", req.params.id, updateData);
+    }
 
     if (!updatedMeeting) {
       return res.status(404).json({ error: "Meeting not found" });
@@ -85,12 +117,25 @@ router.put("/:id", async (req, res) => {
 // DELETE cancel/remove meeting record
 router.delete("/:id", async (req, res) => {
   try {
-    const meeting = await Meeting.findById(req.params.id);
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let meeting;
+
+    if (isDbConnected) {
+      meeting = await Meeting.findById(req.params.id);
+    } else {
+      meeting = jsonDb.findById("meetings", req.params.id);
+    }
+
     if (!meeting) {
       return res.status(404).json({ error: "Meeting not found" });
     }
 
-    await Meeting.findByIdAndDelete(req.params.id);
+    if (isDbConnected) {
+      await Meeting.findByIdAndDelete(req.params.id);
+    } else {
+      jsonDb.findByIdAndDelete("meetings", req.params.id);
+    }
+
     res.json({ success: true, message: "Meeting cancelled successfully" });
   } catch (error) {
     res.status(500).json({ error: "Failed to cancel meeting" });
@@ -98,3 +143,4 @@ router.delete("/:id", async (req, res) => {
 });
 
 export default router;
+
