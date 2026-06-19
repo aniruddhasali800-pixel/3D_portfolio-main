@@ -1,0 +1,19 @@
+# Aniruddha Sali | 3D Portfolio
+
+This is my personal portfolio website built with **React**, **Three.js**, and **Tailwind CSS**. It features interactive 3D elements and a smooth user experience.
+
+![3D Website](https://i.ibb.co/ryytGVx/Screenshot-2023-11-25-at-11-28-11-AM.png)
+
+## 🚀 Live Demo
+Check it out here: [https://3-d-portfolio-main-seven.vercel.app](https://3-d-portfolio-main-seven.vercel.app)
+
+## 🛠️ Tech Stack
+- **Framework**: React.js
+- **3D Rendering**: Three.js / React Three Fiber
+- **Styling**: Tailwind CSS
+- **Deployment**: Vercel
+
+## 📬 Contact
+- **GitHub**: [aniruddhasali800-pixel](https://github.com/aniruddhasali800-pixel)
+- **LinkedIn**: [Your LinkedIn URL]
+- **Portfolio Repository**: [3D_portfolio-main](https://github.com/aniruddhasali800-pixel/3D_portfolio-main)
