@@ -104,9 +104,10 @@ router.post("/", upload.array("attachments", 5), async (req, res) => {
 router.put("/:id/read", async (req, res) => {
   try {
     const isDbConnected = mongoose.connection.readyState === 1;
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
     let message;
 
-    if (isDbConnected) {
+    if (isDbConnected && isValidObjectId) {
       message = await Message.findByIdAndUpdate(
         req.params.id,
         { isRead: true },
@@ -134,9 +135,10 @@ router.post("/:id/reply", async (req, res) => {
     }
 
     const isDbConnected = mongoose.connection.readyState === 1;
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
     let message;
 
-    if (isDbConnected) {
+    if (isDbConnected && isValidObjectId) {
       message = await Message.findById(req.params.id);
       if (!message) {
         return res.status(404).json({ error: "Message not found" });
@@ -173,9 +175,10 @@ router.post("/:id/reply", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const isDbConnected = mongoose.connection.readyState === 1;
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
     let message;
 
-    if (isDbConnected) {
+    if (isDbConnected && isValidObjectId) {
       message = await Message.findById(req.params.id);
     } else {
       message = jsonDb.findById("messages", req.params.id);
@@ -186,13 +189,15 @@ router.delete("/:id", async (req, res) => {
     }
 
     // Delete attachments files
-    for (const att of message.attachments) {
-      if (fs.existsSync(att.path)) {
-        fs.unlinkSync(att.path);
+    if (message.attachments && Array.isArray(message.attachments)) {
+      for (const att of message.attachments) {
+        if (att && att.path && fs.existsSync(att.path)) {
+          fs.unlinkSync(att.path);
+        }
       }
     }
 
-    if (isDbConnected) {
+    if (isDbConnected && isValidObjectId) {
       await Message.findByIdAndDelete(req.params.id);
     } else {
       jsonDb.findByIdAndDelete("messages", req.params.id);

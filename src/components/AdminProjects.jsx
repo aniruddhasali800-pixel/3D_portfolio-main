@@ -104,39 +104,53 @@ const AdminProjects = () => {
     }
     if (window.confirm("Are you sure you want to delete this project?")) {
       try {
-        await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
           method: "DELETE",
         });
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || "Failed to delete project");
+        }
         fetchProjects();
+        alert("Project deleted successfully!");
       } catch (error) {
         console.error("Error deleting project:", error);
+        alert(`Failed to delete project: ${error.message}`);
       }
     }
   };
 
   const handleEditLink = async (id, currentLink, isDefault, linkType = "link") => {
-    const promptMessage = linkType === "githubLink" ? "Enter new GitHub link for the project:" : "Enter new live link for the project:";
-    const newLink = window.prompt(promptMessage, currentLink);
-    if (newLink && newLink !== currentLink) {
+    const promptMessage = linkType === "githubLink" ? "Enter new GitHub link for the project (leave blank to remove):" : "Enter new live link for the project:";
+    const newLink = window.prompt(promptMessage, currentLink || "");
+    if (newLink === null) return; // User clicked Cancel
+    
+    const trimmedLink = newLink.trim();
+    if (trimmedLink !== (currentLink || "")) {
         if(isDefault) {
              alert('To edit a default project, please create a new custom version of it in the form above.');
              return;
         }
         try {
             const body = {};
-            body[linkType] = newLink;
+            body[linkType] = trimmedLink;
 
-            await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+            const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(body),
             });
+            if (!response.ok) {
+              const errData = await response.json();
+              throw new Error(errData.error || "Failed to update project link");
+            }
             fetchProjects();
+            alert("Project link updated successfully!");
         } catch (error) {
             console.error("Error updating project link:", error);
-            alert("Failed to update project link.");
+            alert(`Failed to update project link: ${error.message}`);
         }
     }
   };
@@ -200,11 +214,11 @@ const AdminProjects = () => {
                 </div>
                 <div className='flex gap-2 ml-auto'>
                     <button onClick={() => handleEditLink(project.id || project._id, project.link, project.isDefault, "link")} className='text-emerald-600 text-[10px] font-semibold hover:underline bg-emerald-50 px-2 py-1 rounded'>Edit Live</button>
-                    {project.githubLink && (
-                      <button onClick={() => handleEditLink(project.id || project._id, project.githubLink, project.isDefault, "githubLink")} className='text-purple-600 text-[10px] font-semibold hover:underline bg-purple-50 px-2 py-1 rounded'>Edit Git</button>
-                    )}
+                    <button onClick={() => handleEditLink(project.id || project._id, project.githubLink || "", project.isDefault, "githubLink")} className='text-purple-600 text-[10px] font-semibold hover:underline bg-purple-50 px-2 py-1 rounded'>
+                      {project.githubLink ? "Edit Git" : "Add Git"}
+                    </button>
                     {!project.isDefault && (
-                        <button onClick={() => handleDelete(project._id || project.id, project.isDefault)} className='text-red-500 text-[10px] font-semibold hover:underline bg-red-50 px-2 py-1 rounded'>Delete</button>
+                        <button onClick={() => handleDelete(project.id || project._id, project.isDefault)} className='text-red-500 text-[10px] font-semibold hover:underline bg-red-50 px-2 py-1 rounded'>Delete</button>
                     )}
                 </div>
               </div>

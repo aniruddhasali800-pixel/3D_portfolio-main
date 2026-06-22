@@ -105,9 +105,10 @@ router.put("/:id", async (req, res) => {
     updateData.updatedAt = Date.now();
 
     const isDbConnected = mongoose.connection.readyState === 1;
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
     let updatedProject;
 
-    if (isDbConnected) {
+    if (isDbConnected && isValidObjectId) {
       updatedProject = await Project.findByIdAndUpdate(
         req.params.id,
         updateData,
@@ -134,9 +135,10 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const isDbConnected = mongoose.connection.readyState === 1;
+    const isValidObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
     let project;
 
-    if (isDbConnected) {
+    if (isDbConnected && isValidObjectId) {
       project = await Project.findById(req.params.id);
     } else {
       project = jsonDb.findById("projects", req.params.id);
@@ -154,7 +156,7 @@ router.delete("/:id", async (req, res) => {
       }
     }
 
-    if (isDbConnected) {
+    if (isDbConnected && isValidObjectId) {
       await Project.findByIdAndDelete(req.params.id);
     } else {
       jsonDb.findByIdAndDelete("projects", req.params.id);
